@@ -13,10 +13,6 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
     private lateinit var binding: ActivityMainBinding
 
-    private val mInputSize = 224
-    private val mModelPath = "converted_model.tflite"
-    private val mLabelPath = "label.txt"
-
     private lateinit var classifier: Classifier
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -24,8 +20,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         binding = ActivityMainBinding.inflate(layoutInflater)
 
         initView()
-
-        classifier = Classifier(assets, mModelPath, mLabelPath, mInputSize)
+        classifier = Classifier(this)
 
         setContentView(binding.root)
     }

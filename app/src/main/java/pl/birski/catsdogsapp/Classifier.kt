@@ -1,8 +1,8 @@
 package pl.birski.catsdogsapp
 
+import android.content.Context
 import android.content.res.AssetManager
 import android.graphics.Bitmap
-import android.util.Log
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
 import java.nio.ByteBuffer
@@ -13,25 +13,31 @@ import java.util.PriorityQueue
 import kotlin.Comparator
 import kotlin.collections.ArrayList
 
-class Classifier(assetManager: AssetManager, modelPath: String, labelPath: String, inputSize: Int) {
+class Classifier(
+    private val context: Context
+) {
     private var interpreter: Interpreter
     private var lableList: List<String>
-    private val INPUT_SIZE: Int = inputSize
+    private val INPUT_SIZE = 224
     private val PIXEL_SIZE: Int = 3
     private val IMAGE_MEAN = 0
     private val IMAGE_STD = 255.0f
     private val MAX_RESULTS = 3
     private val THRESHOLD = 0.4f
 
+    private val modelPath = "converted_model.tflite"
+    private val labelPath = "label.txt"
+
     init {
         val options = Interpreter.Options()
+        val assetManager = context.assets
         options.setNumThreads(5)
         options.setUseNNAPI(true)
-        interpreter = Interpreter(loadModelFile(assetManager, modelPath), options)
-        lableList = loadLabelList(assetManager, labelPath)
+        interpreter = Interpreter(loadModelFile(assetManager), options)
+        lableList = loadLabelList(assetManager)
     }
 
-    private fun loadModelFile(assetManager: AssetManager, modelPath: String): MappedByteBuffer {
+    private fun loadModelFile(assetManager: AssetManager): MappedByteBuffer {
         val fileDescriptor = assetManager.openFd(modelPath)
         val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
         val fileChannel = inputStream.channel
@@ -40,9 +46,8 @@ class Classifier(assetManager: AssetManager, modelPath: String, labelPath: Strin
         return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
     }
 
-    private fun loadLabelList(assetManager: AssetManager, labelPath: String): List<String> {
-        return assetManager.open(labelPath).bufferedReader().useLines { it.toList() }
-    }
+    private fun loadLabelList(assetManager: AssetManager) =
+        assetManager.open(labelPath).bufferedReader().useLines { it.toList() }
 
     fun recognizeImage(bitmap: Bitmap): List<Recognition> {
         val scaledBitmap = Bitmap.createScaledBitmap(bitmap, INPUT_SIZE, INPUT_SIZE, false)
@@ -72,13 +77,9 @@ class Classifier(assetManager: AssetManager, modelPath: String, labelPath: Strin
     }
 
     private fun getSortedResult(labelProbArray: Array<FloatArray>): List<Recognition> {
-        Log.d("Classifier", "List Size:(%d, %d, %d)".format(labelProbArray.size, labelProbArray[0].size, lableList.size))
-
         val pq = PriorityQueue(
             MAX_RESULTS,
-            Comparator<Recognition> {
-                    (_, _, confidence1), (_, _, confidence2)
-                ->
+            Comparator<Recognition> { (_, _, confidence1), (_, _, confidence2) ->
                 confidence1.compareTo(confidence2) * -1
             }
         )
@@ -95,7 +96,6 @@ class Classifier(assetManager: AssetManager, modelPath: String, labelPath: Strin
                 )
             }
         }
-        Log.d("Classifier", "pqsize:(%d)".format(pq.size))
 
         val recognitions = ArrayList<Recognition>()
         val recognitionsSize = pq.size.coerceAtMost(MAX_RESULTS)
